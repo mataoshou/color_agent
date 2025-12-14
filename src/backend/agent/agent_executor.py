@@ -214,7 +214,12 @@ class AgentExecutorManager:
             
             while has_pending_tool_calls:
                 # 调用 LLM
+                logger.info("调用 LLM 获取响应")
                 response = self.llm.invoke(messages)
+                
+                # 记录模型思考过程
+                logger.debug(f"LLM 响应结构: {type(response).__name__}")
+                logger.debug(f"LLM 响应内容: {response}")
                 
                 # 将LLM响应添加到消息列表中，这样后续的ToolMessage就有了正确的前驱
                 messages.append(response)
@@ -259,6 +264,8 @@ class AgentExecutorManager:
             if self.chat_history and final_output:
                 self.chat_history.add_ai_message(final_output)
             
+            # 记录模型最终输出
+            logger.info(f"模型最终输出: {final_output}")
             logger.info("Agent 执行完成")
             
             return {"output": final_output}
@@ -296,7 +303,12 @@ class AgentExecutorManager:
             
             while has_pending_tool_calls:
                 # 异步调用 LLM
+                logger.info("异步调用 LLM 获取响应")
                 response = await self.llm.ainvoke(messages)
+                
+                # 记录模型思考过程
+                logger.debug(f"LLM 异步响应结构: {type(response).__name__}")
+                logger.debug(f"LLM 异步响应内容: {response}")
                 
                 # 将LLM响应添加到消息列表中，这样后续的ToolMessage就有了正确的前驱
                 messages.append(response)
@@ -341,6 +353,8 @@ class AgentExecutorManager:
             if self.chat_history and final_output:
                 self.chat_history.add_ai_message(final_output)
             
+            # 记录模型最终输出
+            logger.info(f"模型最终输出: {final_output}")
             logger.info("Agent 异步执行完成")
             
             return {"output": final_output}

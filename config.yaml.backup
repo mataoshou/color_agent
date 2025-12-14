@@ -1,0 +1,36 @@
+active_model_id: 331c386c-289f-4f9a-98b8-e925f44aabad
+allowed_formats:
+- .txt
+- .md
+- .py
+- .js
+- .json
+- .yaml
+- .yml
+- .html
+- .css
+- .xml
+- .csv
+- .log
+auto_save: true
+log_file: ./logs/agent.log
+log_level: INFO
+max_file_size: 10485760
+max_history: 100
+max_tokens: 2048
+models:
+  331c386c-289f-4f9a-98b8-e925f44aabad:
+    api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key: sk-ae94dff7db71429b8c4cdcba90476182
+    description: ''
+    id: 331c386c-289f-4f9a-98b8-e925f44aabad
+    model_name: qwen-plus
+    name: qwen
+storage_path: ./sessions
+streaming: true
+temperature: 0.7
+theme: light
+verbose: false
+window_height: 800
+window_width: 1200
+working_directory: .

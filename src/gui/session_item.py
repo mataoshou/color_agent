@@ -42,7 +42,7 @@ class SessionItemWidget(QWidget):
         """初始化 UI"""
         # 主布局
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(10, 8, 10, 8)
+        main_layout.setContentsMargins(10, 10, 10, 10)  # 增加边距，让内容有更多空间
         main_layout.setSpacing(4)
         
         # 第一行：会话名称和时间
@@ -55,6 +55,10 @@ class SessionItemWidget(QWidget):
         name_font.setPointSize(12)
         name_font.setBold(True)
         self.name_label.setFont(name_font)
+        # 设置自动换行，当内容过长时自动换行显示
+        self.name_label.setWordWrap(True)
+        self.name_label.setMinimumWidth(0)
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # 如果是损坏的会话，显示红色
         if self.is_corrupted:
@@ -82,10 +86,12 @@ class SessionItemWidget(QWidget):
         self.preview_label.setStyleSheet("color: #95a5a6;")
         self.preview_label.setWordWrap(True)
         
-        
         main_layout.addWidget(self.preview_label)
         
         self.setLayout(main_layout)
+        
+        # 设置最小高度，确保内容能完整显示
+        self.setMinimumHeight(60)
         
         # 设置默认样式
         self._update_style()

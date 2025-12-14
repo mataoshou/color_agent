@@ -1,0 +1,13 @@
+# GUI Framework
+PyQt6>=6.5.0
+
+# LangChain Core
+langchain>=0.1.0
+langchain-openai>=0.0.5
+
+# Configuration and Data
+PyYAML>=6.0
+requests>=2.31.0
+
+# Development Tools
+pytest>=7.4.0

@@ -302,8 +302,23 @@ class ApplicationController(QObject):
             self.session_created.emit(session.session_id)
             self.status_message.emit(f"已创建会话: {session.name}", 3000)
             
+            # 刷新会话列表前，检查会话数量
+            logger.info(f"刷新会话列表前，会话数量: {len(self.session_manager.list_sessions())}")
+            
             # 刷新会话列表
             self._refresh_sessions_list()
+            
+            # 刷新会话列表后，检查会话数量
+            logger.info(f"刷新会话列表后，会话数量: {len(self.session_manager.list_sessions())}")
+            
+            # 获取所有会话，检查新会话是否在列表中
+            all_sessions = self.session_manager.list_sessions()
+            session_ids = [s.get('session_id') for s in all_sessions]
+            logger.info(f"所有会话ID列表: {session_ids}")
+            if session.session_id in session_ids:
+                logger.info(f"新会话 {session.session_id} 已在会话列表中，位置: {session_ids.index(session.session_id) + 1}")
+            else:
+                logger.error(f"新会话 {session.session_id} 不在会话列表中")
             
             logger.info(f"会话创建成功: {session.session_id}")
             

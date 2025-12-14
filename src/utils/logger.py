@@ -34,7 +34,7 @@ class LoggerManager:
             backup_count: 保留的备份文件数量
             
         Returns:
-            logging.Logger: 配置好的日志对象
+            logging.Logger: 日志对象
         """
         if cls._initialized and cls._logger:
             return cls._logger
@@ -44,9 +44,17 @@ class LoggerManager:
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
         
+        # 获取根 logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+        
+        # 清除已有的 handlers（避免重复初始化）
+        root_logger.handlers.clear()
+        
         # 创建 logger
         logger = logging.getLogger("ChatAgent")
         logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+        logger.propagate = True
         
         # 清除已有的 handlers（避免重复初始化）
         logger.handlers.clear()
@@ -67,7 +75,7 @@ class LoggerManager:
             )
             file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
             file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
+            root_logger.addHandler(file_handler)
             
             # 创建一个自定义的 emit 方法来确保每次都刷新
             original_emit = file_handler.emit
@@ -85,7 +93,7 @@ class LoggerManager:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
         console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+        root_logger.addHandler(console_handler)
         
         # 标记为已初始化
         cls._initialized = True

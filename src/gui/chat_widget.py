@@ -67,11 +67,33 @@ class ChatWidget(QWidget):
         # 消息列表展示区域
         self.message_list = QListWidget()
         self.message_list.setObjectName("messageList")
+        self.message_list.setAlternatingRowColors(True)
+        self.message_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         self.message_list.setSpacing(8)
+        self.message_list.setContentsMargins(10, 10, 10, 10)  # 添加边距，让气泡有空间扩展
         self.message_list.setWordWrap(True)
         self.message_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.message_list.customContextMenuRequested.connect(self._show_message_context_menu)
         self.message_list.viewport().installEventFilter(self)
+        
+        # 设置大小策略，让列表可以自由扩展
+        from PyQt6.QtWidgets import QSizePolicy
+        self.message_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        # 确保列表项能够自动调整大小
+        self.message_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+        
+        # 设置滚动模式，确保大文本内容滚动流畅
+        self.message_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.message_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        # 确保列表项能够自动调整高度
+        self.message_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+        
+        # 设置列表项的布局模式，确保内容完全显示
+        self.message_list.setLayoutMode(QListWidget.LayoutMode.Batched)
+        self.message_list.setBatchSize(10000)  # 增大批处理大小，减少布局更新次数
+        
         layout.addWidget(self.message_list, stretch=1)
         
         # 创建浮动工具栏（初始隐藏）
@@ -105,7 +127,7 @@ class ChatWidget(QWidget):
         # 消息输入框
         self.input_text = QTextEdit()
         self.input_text.setObjectName("inputText")
-        self.input_text.setPlaceholderText("输入消息... (Ctrl+Enter 发送)")
+        self.input_text.setPlaceholderText("输入消息... (Enter 发送, Ctrl+Enter 换行)")
         self.input_text.setMaximumHeight(120)
         self.input_text.setMinimumHeight(60)
         input_layout.addWidget(self.input_text)
@@ -190,6 +212,9 @@ class ChatWidget(QWidget):
         
         # 文本处理功能选择
         self.text_processing_combo.currentIndexChanged.connect(self._on_text_processing_selected)
+        
+        # 为输入框安装事件过滤器
+        self.input_text.installEventFilter(self)
     
     def _on_send_clicked(self) -> None:
         """发送按钮点击处理"""
@@ -234,6 +259,34 @@ class ChatWidget(QWidget):
         self.input_text.setFocus()
         
         logger.debug(f"应用文本处理模板: {function_type}")
+    
+    def resizeEvent(self, event) -> None:
+        """
+        窗口大小变化事件处理
+        当窗口大小变化时，重新计算所有消息气泡的宽度
+        """
+        super().resizeEvent(event)
+        
+        # 重新计算所有消息气泡的宽度
+        for i in range(self.message_list.count()):
+            item = self.message_list.item(i)
+            bubble = self.message_list.itemWidget(item)
+            if hasattr(bubble, 'update_width'):
+                bubble.update_width()
+                
+                # 调用MessageBubble的update_content方法，确保尺寸计算正确执行
+                if hasattr(bubble, 'content'):
+                    bubble.update_content(bubble.content.toPlainText()) if hasattr(bubble.content, 'toPlainText') else None
+                
+                # 更新列表项大小
+                size_hint = bubble.sizeHint()
+                item.setSizeHint(size_hint)
+                # 使用size_hint的高度作为气泡的最小高度，确保气泡之间有足够的间距
+                bubble.setMinimumHeight(size_hint.height())
+        
+        # 强制刷新整个消息列表的布局
+        self.message_list.updateGeometry()
+        self.message_list.viewport().update()
     
     def _get_text_processing_template(self, function_type: str, text: str) -> str:
         """
@@ -330,7 +383,7 @@ class ChatWidget(QWidget):
     
     def eventFilter(self, obj, event) -> bool:
         """
-        事件过滤器，用于检测文本选择
+        事件过滤器，用于检测文本选择和处理输入框键盘事件
         
         Args:
             obj: 事件对象
@@ -342,7 +395,20 @@ class ChatWidget(QWidget):
         from PyQt6.QtCore import QEvent
         from PyQt6.QtGui import QMouseEvent
         
-        if obj == self.message_list.viewport():
+        # 处理输入框的键盘事件
+        # 首先检查 self.input_text 是否存在，避免初始化顺序问题
+        if hasattr(self, 'input_text') and obj == self.input_text and event.type() == QEvent.Type.KeyPress:
+            # Enter 键发送消息
+            if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+                if event.modifiers() != Qt.KeyboardModifier.ControlModifier:
+                    self.send_message()
+                    return True
+                # Ctrl+Enter 换行，使用默认行为
+                else:
+                    return False
+        
+        # 处理消息列表的鼠标事件
+        elif hasattr(self, 'message_list') and obj == self.message_list.viewport():
             if event.type() == QEvent.Type.MouseButtonRelease:
                 # 检查是否有选中的文本
                 self._check_text_selection()
@@ -377,12 +443,8 @@ class ChatWidget(QWidget):
         Args:
             event: 键盘事件
         """
-        # Ctrl+Enter 发送消息
-        if event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            self.send_message()
-            event.accept()
-        else:
-            super().keyPressEvent(event)
+        # 所有键盘事件现在通过eventFilter处理
+        super().keyPressEvent(event)
     
     def send_message(self) -> None:
         """发送消息"""
@@ -393,7 +455,7 @@ class ChatWidget(QWidget):
             logger.debug("消息为空，不发送")
             return
         
-        logger.info(f"发送消息: {text[:50]}...")
+        logger.info(f"用户输入: {text}")
         
         # 发送信号
         self.message_sent.emit(text)
@@ -447,11 +509,16 @@ class ChatWidget(QWidget):
             content: 消息内容
             timestamp: 时间戳，如果为 None 则使用当前时间
         """
+        logger.info(f"=== 开始添加用户消息 ===")
+        logger.info(f"消息内容: {content[:50]}{'...' if len(content) > 50 else ''}")
+        logger.info(f"消息列表当前尺寸: 宽度={self.message_list.width()}, 高度={self.message_list.height()}")
+        
         if timestamp is None:
             timestamp = datetime.now().strftime("%H:%M:%S")
         
         # 创建消息气泡
         bubble = MessageBubble('user', content, timestamp)
+        logger.info(f"创建用户气泡完成，初始尺寸: {bubble.sizeHint().width()}x{bubble.sizeHint().height()}")
         
         # 创建列表项
         item = QListWidgetItem(self.message_list)
@@ -459,25 +526,41 @@ class ChatWidget(QWidget):
         # 添加到列表
         self.message_list.addItem(item)
         self.message_list.setItemWidget(item, bubble)
+        logger.info(f"气泡添加到列表完成")
         
         # 强制更新大小 - 使用QTimer延迟更新以确保布局完成
         from PyQt6.QtCore import QTimer
         def update_size():
-            # 先确保气泡及其内容完全调整大小
-            bubble.adjustSize()
-            # 再获取调整后的大小提示
+            logger.info(f"开始更新消息大小，角色: {bubble.role}, 当前气泡尺寸: {bubble.size()}")
+            
+            # 先更新气泡宽度，确保使用最新的父容器宽度计算
+            if hasattr(bubble, 'update_width'):
+                bubble.update_width()
+                logger.info(f"已更新消息气泡宽度")
+            
+            # 调用MessageBubble的update_content方法，确保尺寸计算和日志记录正确执行
+            bubble.update_content(content)
+            
+            # 获取调整后的大小提示
             size_hint = bubble.sizeHint()
+            logger.info(f"气泡调整后sizeHint: {size_hint}")
+            
             # 设置列表项的大小
             item.setSizeHint(size_hint)
-            logger.debug(f"更新用户消息大小: {size_hint}")
+            logger.info(f"列表项大小更新完成，新尺寸: {size_hint}")
+            
+            # 强制刷新整个消息列表的布局
+            self.message_list.updateGeometry()
+            self.message_list.viewport().update()
+            
+            # 滚动到底部，确保最新内容可见
+            self.message_list.scrollToBottom()
+            logger.info(f"消息列表布局已强制刷新并滚动到底部")
         
         # 增加延迟时间，确保气泡完全渲染
-        QTimer.singleShot(50, update_size)
+        QTimer.singleShot(200, update_size)
         
-        # 滚动到底部
-        self.message_list.scrollToBottom()
-        
-        logger.debug(f"添加用户消息: {content[:30]}...")
+        logger.info(f"=== 用户消息添加完成 ===")
     
     def add_assistant_message(self, content: str, timestamp: Optional[str] = None, 
                              original_text: Optional[str] = None) -> None:
@@ -489,17 +572,23 @@ class ChatWidget(QWidget):
             timestamp: 时间戳，如果为 None 则使用当前时间
             original_text: 原始文本（用于差异对比），如果提供则显示"查看差异"按钮
         """
+        logger.info(f"=== 开始添加AI助手消息 ===")
+        logger.info(f"消息内容: {content[:50]}{'...' if len(content) > 50 else ''}")
+        logger.info(f"消息列表当前尺寸: 宽度={self.message_list.width()}, 高度={self.message_list.height()}")
+        
         if timestamp is None:
             timestamp = datetime.now().strftime("%H:%M:%S")
         
         # 创建消息气泡
         bubble = MessageBubble('assistant', content, timestamp)
+        logger.info(f"创建AI气泡完成，初始尺寸: {bubble.sizeHint().width()}x{bubble.sizeHint().height()}")
         
         # 如果提供了原始文本，启用差异查看
         if original_text:
             bubble.enable_diff_view(original_text)
             # 连接差异查看信号
             bubble.view_diff_requested.connect(self._show_text_diff)
+            logger.info(f"气泡差异查看功能已启用")
         
         # 创建列表项
         item = QListWidgetItem(self.message_list)
@@ -507,25 +596,49 @@ class ChatWidget(QWidget):
         # 添加到列表
         self.message_list.addItem(item)
         self.message_list.setItemWidget(item, bubble)
+        logger.info(f"气泡添加到列表完成")
         
         # 强制更新大小 - 使用QTimer延迟更新以确保布局完成
         from PyQt6.QtCore import QTimer
         def update_size():
-            # 先确保气泡及其内容完全调整大小
-            bubble.adjustSize()
+            logger.info(f"开始更新AI气泡尺寸，当前气泡尺寸: {bubble.sizeHint().width()}x{bubble.sizeHint().height()}")
+            
+            # 先更新气泡宽度，确保使用最新的父容器宽度计算
+            if hasattr(bubble, 'update_width'):
+                bubble.update_width()
+                logger.info(f"已更新AI消息气泡宽度")
+            
+            # 调用MessageBubble的update_content方法，确保尺寸计算和日志记录正确执行
+            bubble.update_content(content)
+            
             # 再获取调整后的大小提示
             size_hint = bubble.sizeHint()
+            logger.info(f"气泡调整后sizeHint: {size_hint}")
+            
+            # 确保获取到的尺寸足够大
+            min_height = 40  # 最小高度
+            if size_hint.height() < min_height:
+                size_hint.setHeight(min_height)
+                logger.info(f"调整sizeHint高度到最小高度: {min_height}")
+            
             # 设置列表项的大小
+            # 使用sizeHint高度而不是实际高度，确保列表项高度与气泡内部计算的合适高度一致
             item.setSizeHint(size_hint)
-            logger.debug(f"更新 AI 消息大小: {size_hint}")
+            logger.info(f"更新AI消息列表项大小: {size_hint} (使用sizeHint高度)")
+            
+            # 强制刷新整个消息列表的布局
+            self.message_list.updateGeometry()
+            self.message_list.viewport().update()
+            logger.info(f"消息列表布局已强制刷新")
+            
+            # 滚动到底部，确保最新内容可见
+            self.message_list.scrollToBottom()
+            logger.info(f"消息列表已滚动到底部")
         
         # 增加延迟时间，确保气泡完全渲染
-        QTimer.singleShot(50, update_size)
+        QTimer.singleShot(200, update_size)
         
-        # 滚动到底部
-        self.message_list.scrollToBottom()
-        
-        logger.debug(f"添加 AI 消息: {content[:30]}...")
+        logger.info(f"=== AI助手消息添加完成 ===")
     
     def show_typing_indicator(self) -> None:
         """显示正在输入指示器"""
@@ -640,30 +753,122 @@ class ChatWidget(QWidget):
         self._streaming_buffer.clear()
         
         # 更新气泡内容
-        current_content = self._streaming_bubble.content
+        current_content = self._streaming_bubble.content.toPlainText() if hasattr(self._streaming_bubble.content, 'toPlainText') else str(self._streaming_bubble.content)
         new_content = current_content + chunk
         self._streaming_bubble.update_content(new_content)
         
-        # 更新列表项大小 - 使用QTimer延迟更新
-        if self._streaming_item:
-            from PyQt6.QtCore import QTimer
-            def update_size():
-                if self._streaming_bubble and self._streaming_item:
-                    size_hint = self._streaming_bubble.sizeHint()
-                    self._streaming_item.setSizeHint(size_hint)
-            
-            QTimer.singleShot(0, update_size)
+        # 流式响应过程中跳过尺寸更新，将在响应结束后统一处理
+        logger.debug(f"[流式响应] 更新内容长度: {len(new_content)}，跳过尺寸调整")
         
         # 滚动到底部
         self.message_list.scrollToBottom()
     
     def finish_streaming_response(self) -> None:
         """完成流式响应"""
+        print(f"[DEBUG] [完成响应] finish_streaming_response方法被调用")
         # 停止定时器
         self._update_timer.stop()
         
         # 刷新剩余缓冲区
         self._flush_streaming_buffer()
+        
+        # 在响应结束后进行最终的尺寸调整
+        if self._streaming_bubble and self._streaming_item:
+            print(f"[DEBUG] [完成响应] 检测到_streaming_bubble和_streaming_item，准备设置最终尺寸调整")
+            # 保存当前引用，避免定时器回调时引用已被清除
+            bubble_ref = self._streaming_bubble
+            item_ref = self._streaming_item
+            
+            def final_size_update():
+                """流式响应结束后执行最终的尺寸调整"""
+                print(f"[DEBUG] [流式响应完成] 开始最终尺寸调整，气泡对象: {bubble_ref}, 列表项: {item_ref}")
+                logger.info(f"[详细调试] [流式响应完成] 开始最终尺寸调整，气泡对象: {bubble_ref}, 列表项: {item_ref}")
+                try:
+                    # 检查对象是否仍然有效
+                    _ = bubble_ref.layout()
+                    
+                    # 记录初始状态
+                    initial_size_hint = bubble_ref.sizeHint()
+                    initial_actual_size = bubble_ref.size()
+                    print(f"[DEBUG] [流式响应完成] 初始状态 - sizeHint: {initial_size_hint}, actual size: {initial_actual_size}")
+                    logger.info(f"[详细调试] [流式响应完成] 初始状态 - sizeHint: {initial_size_hint}, actual size: {initial_actual_size}")
+                    
+                    # 第一步：强制气泡组件本身执行完整的尺寸计算
+                    bubble_ref.updateGeometry()
+                    bubble_ref.adjustSize()
+                    after_adjust_size = bubble_ref.size()
+                    print(f"[DEBUG] [流式响应完成] 气泡组件初步调整后尺寸: {after_adjust_size}")
+                    logger.info(f"[详细调试] [流式响应完成] 气泡组件初步调整后尺寸: {after_adjust_size}")
+                    
+                    # 第二步：使用sizeHint方法获取气泡的完整高度（包括所有边距）
+                    size_hint = bubble_ref.sizeHint()
+                    print(f"[DEBUG] [流式响应完成] 使用sizeHint获取的完整高度: {size_hint}")
+                    logger.info(f"[详细调试] [流式响应完成] 使用sizeHint获取的完整高度: {size_hint}")
+                    
+                    # 设置气泡的最小高度为sizeHint的高度，确保所有边距都被包含
+                    bubble_ref.setMinimumHeight(size_hint.height())
+                    print(f"[DEBUG] [流式响应完成] 使用sizeHint高度设置气泡最小高度: {size_hint.height()}")
+                    logger.info(f"[详细调试] [流式响应完成] 使用sizeHint高度设置气泡最小高度: {size_hint.height()}")
+                    
+                    # 第三步：让气泡组件内部的最终调整逻辑重新执行
+                    # 这会触发message_bubble内部的尺寸计算
+                    if hasattr(bubble_ref, 'content') and hasattr(bubble_ref.content, 'toPlainText'):
+                        current_content = bubble_ref.content.toPlainText()
+                        print(f"[DEBUG] [流式响应完成] 准备重新触发尺寸计算，当前内容长度: {len(current_content)}, 行数: {current_content.count(chr(10)) + 1}")
+                        logger.info(f"[详细调试] [流式响应完成] 准备重新触发尺寸计算，当前内容长度: {len(current_content)}, 行数: {current_content.count(chr(10)) + 1}")
+                        bubble_ref.update_content(current_content)  # 用相同内容触发完整尺寸计算
+                    print(f"[DEBUG] [流式响应完成] 重新触发气泡组件的尺寸计算完成")
+                    logger.info(f"[详细调试] [流式响应完成] 重新触发气泡组件的尺寸计算完成")
+                    
+                    # 第四步：获取气泡组件的sizeHint，确保内容完整显示
+                    size_hint = bubble_ref.sizeHint()
+                    print(f"[DEBUG] [流式响应完成] 使用sizeHint获取的完整尺寸: {size_hint}")
+                    logger.info(f"[详细调试] [流式响应完成] 使用sizeHint获取的完整尺寸: {size_hint}")
+                    
+                    # 第五步：设置列表项大小为气泡的sizeHint
+                    # 直接使用气泡的sizeHint，确保所有边距都被包含
+                    item_ref.setSizeHint(size_hint)
+                    print(f"[DEBUG] [流式响应完成] 更新列表项大小: {size_hint} (使用sizeHint)")
+                    logger.info(f"[详细调试] [流式响应完成] 更新列表项大小: {size_hint} (使用sizeHint)")
+                    
+                    # 第六步：强制刷新整个消息列表的布局
+                    self.message_list.viewport().update()
+                    self.message_list.updateGeometry()
+                    self.message_list.layout().invalidate()
+                    self.message_list.layout().update()
+                    print(f"[DEBUG] [流式响应完成] 消息列表布局已强制刷新")
+                    logger.info(f"[详细调试] [流式响应完成] 消息列表布局已强制刷新")
+                    
+                    # 第七步：再次调整气泡大小和列表项大小，确保所有尺寸更新都生效
+                    bubble_ref.updateGeometry()
+                    bubble_ref.adjustSize()
+                    final_size_hint = bubble_ref.sizeHint()
+                    item_ref.setSizeHint(final_size_hint)
+                    print(f"[DEBUG] [流式响应完成] 再次确认并更新列表项大小: {final_size_hint}")
+                    logger.info(f"[详细调试] [流式响应完成] 再次确认并更新列表项大小: {final_size_hint}")
+                    
+                    # 记录最终状态
+                    final_actual_size = bubble_ref.size()
+                    print(f"[DEBUG] [流式响应完成] 最终状态 - sizeHint: {final_size_hint}, actual size: {final_actual_size}, 列表项大小: {item_ref.sizeHint()}")
+                    logger.info(f"[详细调试] [流式响应完成] 最终状态 - sizeHint: {final_size_hint}, actual size: {final_actual_size}, 列表项大小: {item_ref.sizeHint()}")
+                    
+                    # 最后滚动到底部确保完整显示
+                    self.message_list.scrollToBottom()
+                    print(f"[DEBUG] [流式响应完成] 已滚动到底部")
+                    logger.info(f"[详细调试] [流式响应完成] 已滚动到底部")
+                except RuntimeError:
+                    # 对象已被删除，跳过尺寸调整
+                    print(f"[DEBUG] [流式响应完成] 对象已被删除，跳过尺寸调整")
+                    logger.debug(f"[详细调试] [流式响应完成] 对象已被删除，跳过尺寸调整")
+                
+                print(f"[DEBUG] [流式响应完成] 最终尺寸调整完成")
+                logger.info(f"[详细调试] [流式响应完成] 最终尺寸调整完成")
+            
+            # 使用更长的延迟时间(1000ms)，确保message_bubble内部的定时器先完成调整
+            # 解决只有最后一个气泡显示不全的问题
+            from PyQt6.QtCore import QTimer
+            print(f"[DEBUG] [完成响应] 设置1000ms定时器执行final_size_update")
+            QTimer.singleShot(1000, final_size_update)
         
         # 清空引用
         self._streaming_bubble = None

@@ -6,7 +6,7 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-    QListWidget, QListWidgetItem, QInputDialog, QMessageBox, QMenu
+    QListWidget, QListWidgetItem, QInputDialog, QMessageBox, QMenu, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -85,6 +85,14 @@ class SessionSidebar(QWidget):
         self.session_list.setSpacing(4)
         self.session_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)  # 禁用默认选中
         self.session_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # 禁用焦点
+        
+        # 设置大小策略，确保列表能够垂直扩展
+        size_policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.session_list.setSizePolicy(size_policy)
+        
+        # 启用垂直滚动条
+        self.session_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
         self.session_list.setStyleSheet("""
             QListWidget {
                 background-color: #fafafa;
@@ -103,13 +111,25 @@ class SessionSidebar(QWidget):
             QListWidget::item:hover {
                 background-color: transparent;
             }
+            QScrollBar:vertical {
+                width: 6px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #bdc3c7;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #95a5a6;
+            }
         """)
         
         # 设置右键菜单策略
         self.session_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.session_list.customContextMenuRequested.connect(self._show_context_menu)
         
-        main_layout.addWidget(self.session_list)
+        # 添加会话列表到布局，并设置垂直拉伸因子为1，确保它占据剩余空间
+        main_layout.addWidget(self.session_list, 1)
         
         self.setLayout(main_layout)
         
@@ -145,12 +165,23 @@ class SessionSidebar(QWidget):
         
         # 创建列表项
         item = QListWidgetItem(self.session_list)
-        item.setSizeHint(session_widget.sizeHint())
+        
+        # 设置一个合理的最小高度，确保内容能显示完整
+        min_height = 80  # 增加最小高度以容纳多行内容
+        size_hint = session_widget.sizeHint()
+        if size_hint.height() < min_height:
+            size_hint.setHeight(min_height)
+        
+        item.setSizeHint(size_hint)
         item.setData(Qt.ItemDataRole.UserRole, session_id)
         
         # 将组件设置为列表项的 widget
         self.session_list.addItem(item)
         self.session_list.setItemWidget(item, session_widget)
+        
+        # 强制更新项目大小以适应内容
+        session_widget.adjustSize()
+        item.setSizeHint(session_widget.sizeHint())
         
         # 保存引用
         self.session_widgets[session_id] = session_widget
@@ -172,6 +203,14 @@ class SessionSidebar(QWidget):
             self.add_session(session_data)
         
         logger.info(f"加载会话列表: 共 {len(sessions)} 个会话")
+        
+        # 如果有会话，总是选中第一个会话（无论是新创建的还是已有的）
+        if sessions:
+            first_session_id = sessions[0].get('session_id', '')
+            if first_session_id:
+                self.set_selected_session(first_session_id)
+                self.session_selected.emit(first_session_id)
+                logger.info(f"选中第一个会话: {first_session_id}")
     
     def clear_sessions(self):
         """清空会话列表"""

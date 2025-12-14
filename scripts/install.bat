@@ -79,7 +79,7 @@ echo [INFO] This may take a few minutes...
 echo.
 
 REM Install GUI Framework
-echo [INFO] Installing PyQt6 ^(GUI Framework^)...
+echo [INFO] Installing PyQt6 (GUI Framework)...
 pip install "PyQt6>=6.5.0"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install PyQt6
@@ -111,7 +111,7 @@ echo [SUCCESS] LangChain OpenAI installed
 echo.
 
 REM Install Configuration and Data libraries
-echo [INFO] Installing PyYAML ^(configuration management^)...
+echo [INFO] Installing PyYAML (configuration management)...
 pip install "PyYAML>=6.0"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install PyYAML
@@ -121,7 +121,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo [SUCCESS] PyYAML installed
 echo.
 
-echo [INFO] Installing requests ^(HTTP library^)...
+echo [INFO] Installing requests (HTTP library)...
 pip install "requests>=2.31.0"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install requests
@@ -132,7 +132,7 @@ echo [SUCCESS] requests installed
 echo.
 
 REM Install Development Tools
-echo [INFO] Installing pytest ^(testing framework^)...
+echo [INFO] Installing pytest (testing framework)...
 pip install "pytest>=7.4.0"
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install pytest
@@ -173,7 +173,7 @@ echo.
 echo # Active Model Configuration
 echo active_model_id: null  # Will be set when user adds first model
 echo.
-echo # Model Configurations ^(OpenAPI compatible models^)
+echo # Model Configurations (OpenAPI compatible models)
 echo models: {}
 echo.
 echo # LangChain Configuration
@@ -333,40 +333,40 @@ echo.
 
 if !VERIFICATION_FAILED! EQU 0 (
     echo ========================================
-    echo Installation Successful!
-    echo ========================================
-    echo.
-    echo The AI Chat Agent has been successfully installed!
-    echo.
-    echo Next Steps:
-    echo   1. Activate the virtual environment:
-    echo      venv\Scripts\activate.bat
-    echo.
-    echo   2. Run the application:
-    echo      python main.py
-    echo.
-    echo   3. On first launch, you'll be guided to add your first AI model configuration
-    echo      ^(OpenAI, Azure OpenAI, or any OpenAPI-compatible service^)
-    echo.
-    echo Quick Start:
-    echo   - Use the provided run script:
-    echo     scripts\run.bat
-    echo.
-    echo Documentation:
-    echo   - User Guide: docs\USER_GUIDE.md
-    echo   - Developer Guide: docs\DEVELOPER_GUIDE.md
-    echo   - API Documentation: docs\API.md
-    echo.
-    echo Happy chatting! 🚀
-    echo.
+echo Installation Successful!
+echo ========================================
+echo.
+echo The AI Chat Agent has been successfully installed!
+echo.
+echo Next Steps:
+echo   1. Activate the virtual environment:
+echo      venv\Scripts\activate.bat
+echo.
+echo   2. Run the application:
+echo      python main.py
+echo.
+echo   3. On first launch, you'll be guided to add your first AI model configuration
+echo      (OpenAI, Azure OpenAI, or any OpenAPI-compatible service)
+echo.
+echo Quick Start:
+echo   - Use the provided run script:
+echo     scripts\run.bat
+echo.
+echo Documentation:
+echo   - User Guide: docs\USER_GUIDE.md
+echo   - Developer Guide: docs\DEVELOPER_GUIDE.md
+echo   - API Documentation: docs\API.md
+echo.
+echo Happy chatting!
+echo.
 ) else (
     echo ========================================
-    echo Installation Completed with Warnings
-    echo ========================================
-    echo.
-    echo [WARNING] Some verification checks failed. Please review the errors above.
-    echo [INFO] You may need to manually fix these issues before running the application.
-    echo.
+echo Installation Completed with Warnings
+echo ========================================
+echo.
+echo [WARNING] Some verification checks failed. Please review the errors above.
+echo [INFO] You may need to manually fix these issues before running the application.
+echo.
     pause
     exit /b 1
 )
